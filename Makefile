@@ -8,10 +8,10 @@ SRC = $(wildcard $(SRC_DIR)/*.c)
 OBJ = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC))
 
 CC = gcc
-CFLAGS = -g -Wall -I$(INC_DIR)
-LDFLAGS = #-shared
+CFLAGS = -g -Wall -fPIC -I$(INC_DIR)
+LDFLAGS = -shared
 
-NAME = test
+NAME = libmmu.so
 TARGET = $(OUT_DIR)/$(NAME)
 
 .PHONY: all
