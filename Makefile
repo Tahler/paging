@@ -3,6 +3,7 @@ SRC_DIR = src
 OUT_DIR = target
 OBJ_DIR = $(OUT_DIR)/obj
 
+INC = $(wildcard $(INC_DIR)/*.h)
 SRC = $(wildcard $(SRC_DIR)/*.c)
 OBJ = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC))
 
@@ -23,7 +24,7 @@ setup:
 $(TARGET): $(OBJ)
 	$(CC) $(LDFLAGS) $(OBJ) -o $(TARGET)
 
-$(OBJ): $(SRC)
+$(OBJ): $(SRC) $(INC)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 .PHONY: clean

@@ -1,8 +1,8 @@
 #include <stdio.h>
-// #include <types.h>
-// #include "types.h"
+#include <tberry/types.h>
 
 int main()
 {
-    printf("hello");
+    u32 y = 3;
+    printf("%d\n", y);
 }
