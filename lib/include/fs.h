@@ -11,17 +11,17 @@
 u8 write_buf(char *path, u8 *buf, usize size)
 {
 	// Open file for writing in binary
-	FILE *file = fopen(file_name, "wb");
+	FILE *file = fopen(path, "wb");
 	// `1` indicates the nobj
 	usize ok = fwrite(buf, size, 1, file);
 	fclose(file);
 	return ok ? 0 : 1;
 }
 
-u8 read_buf(char *file_name, u8 *buf)
+u8 read_buf(char *path, u8 *buf, usize size)
 {
 	// Open file for writing in binary
-	FILE *file = fopen(file_name, "wb");
+	FILE *file = fopen(path, "wb");
 	// `1` indicates the nobj, which is 1 buffer
 	usize ok = fread(buf, size, 1, file);
 	fclose(file);
