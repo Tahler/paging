@@ -107,8 +107,8 @@ Note:
 
 ## TODO
 
-1. Get it to work without any swapping
-1. Use/swap the first page only
-1. Swap the address space
-1. Swap the user page table
-1. LRU cache of `phys_page`
+[x] Get it to work without any swapping
+[ ] Use/swap the first page only
+[ ] Swap the address space
+[ ] Swap the user page table
+[ ] LRU cache of `phys_page`
