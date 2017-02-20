@@ -1,4 +1,4 @@
-INC_DIR = include
+INC_DIR = ../include
 SRC_DIR = src
 LIB_DIR = lib
 OUT_DIR = target

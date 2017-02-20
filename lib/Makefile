@@ -1,4 +1,4 @@
-INC_DIR = include
+INC_DIR = ../include
 SRC_DIR = src
 OUT_DIR = target
 OBJ_DIR = $(OUT_DIR)/obj
