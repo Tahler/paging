@@ -27,8 +27,9 @@
 #define UPT_SIZE (RPT_SIZE * PAGE_LEN)
 // Length of a page table in bytes (2048)
 #define RPT_LEN (RPT_SIZE * TBL_ENTRY_LEN)
+#define NUM_PHYS_PAGES 4
 // Length of physical memory in bytes (18432)
-#define PHYS_RAM_LEN ((4 * PAGE_LEN) + TBL_LEN)
+#define PHYS_RAM_LEN ((NUM_PHYS_PAGES * PAGE_LEN) + RPT_LEN)
 
 // Return codes
 #define SUCCESS		0x00

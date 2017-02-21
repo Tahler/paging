@@ -9,22 +9,18 @@
 #include "fs.h"
 #include "virt_addr.h"
 
-struct root_page_tbl {
-	u16 entries[RPT_SIZE];
-};
+#define RPT_OFFSET 0
+#define PHYS_PAGES_OFFSET RPT_LEN
+#define UPT_PAGE 0
+#define UPT_PAGE_OFFSET (PHYS_PAGES_OFFSET + (UPT_PAGE * PAGE_LEN))
+#define PHYS_PAGE 1
+#define PHYS_PAGE_OFFSET (PHYS_PAGES_OFFSET + (PHYS_PAGE * PAGE_LEN))
 
-struct user_page_tbl {
-	u16 entries[UPT_SIZE];
-};
-
-// #define USABLE_RAM_LEN = (PHYS_RAM_LEN - RPT_LEN)
-// static u8 ram[USABLE_RAM_LEN];
-
-// Rpt is always available
-static struct root_page_tbl rpt;
-// TODO: these should be paged
-static struct user_page_tbl upt;
-static u8 ram[4294967296];
+static u8 ram[PHYS_RAM_LEN];
+static u16 *rpt = (u16*) &ram[RPT_OFFSET];
+// These are swapped into page 0 and page 1 respectively
+static u16 *upt_page = (u16*) &ram[UPT_PAGE_OFFSET];
+static u16 *phys_page = (u16*) &ram[PHYS_PAGE_OFFSET];
 
 void mmu_init()
 {
@@ -32,19 +28,72 @@ void mmu_init()
 }
 
 /*
+ * Returns true if the highest order bit is set in @entry, indicating that the
+ * lowest 12 bits are an address in me
+ */
+bool next_is_in_memory(u16 entry)
+{
+	return (entry >> 15) & 0b1;
+}
+
+usize get_swap_addr(u16 rpn, u16 upn, u16 offset)
+{
+	return rpn * PAGE_LEN * PAGE_LEN
+		+ upn * PAGE_LEN
+		+ offset;
+}
+
+/*
+ * Finds (or creates) the base physical address to access the user page table
+ * entry for @rpn.
+ *
+ * Note: the UPT page is always loaded at UPT_PAGE_OFFSET.
+ */
+usize get_upt_base_addr(u16 rpn)
+{
+	if (!next_is_in_memory(rpt[rpn])) {
+		// TODO: save the old page
+		usize swap_addr = get_swap_addr(rpn, 0, 0);
+		fs_load_buf("swapfile", swap_addr, upt_page, PAGE_LEN);
+		u16 loaded_addr = UPT_PAGE;
+		// Set in mem bit
+		u16 new_entry = loaded_addr | 0x8000;
+		rpt[rpn] = new_entry;
+	}
+	assert((rpt[rpn] & 0xFFF) == UPT_PAGE);
+	return UPT_PAGE;
+}
+
+/*
+ * Finds (or creates) the base physical address to access the physical page for
+ * @upn.
+ *
+ * Note: the base address of the UPT is not needed because this implementation
+ * always has the current page of the UPT at address UPT_PAGE_OFFSET.
+ */
+usize get_phys_base_addr(u16 rpn, u16 upn)
+{
+	if (!next_is_in_memory(upt_page[upn])) {
+		usize swap_addr = get_swap_addr(rpn, upn, 0);
+		fs_load_buf("swapfile", swap_addr, phys_page, PAGE_LEN);
+
+		u16 loaded_addr = PHYS_PAGE;
+		u16 new_entry = loaded_addr | 0x8000;
+		upt_page[upn] = new_entry;
+	}
+	assert((upt_page[upn] & 0xFFF) == PHYS_PAGE);
+	return PHYS_PAGE;
+}
+
+/*
  * Finds (or creates) an address in RAM to access the virtual address.
  * Note: does not handle page overflow.
  */
-usize get_phys_addr(struct parsed_addr parsed)
+usize get_phys_addr(u16 rpn, u16 upn, u16 offset)
 {
-	// u16 rpte = rpt.entries[parsed.rpn];
-	// usize base_upt = rpte * PAGE_LEN;
-	// TODO: instead index ram starting at the loaded page base addr
-	// u16 upte = upt.entries[base_upt + parsed.upn];
-	// usize base_addr = ((usize) upte) * PAGE_LEN;
-	usize base_addr = (parsed.rpn * PAGE_LEN * PAGE_LEN)
-		+ (parsed.upn * PAGE_LEN);
-	usize phys_addr = base_addr + parsed.offset;
+	/*usize upt_base_addr =*/ get_upt_base_addr(rpn);
+	usize phys_base_addr = get_phys_base_addr(rpn, upn);
+	usize phys_addr = phys_base_addr + offset;
 	return phys_addr;
 }
 
@@ -59,7 +108,7 @@ u8 mmu_store(u8 *buf, u32 addr, usize size)
 			? PAGE_LEN - va.offset
 			: num_remaining_bytes;
 
-		usize phys_addr = get_phys_addr(va);
+		usize phys_addr = get_phys_addr(va.rpn, va.upn, va.offset);
 		memcpy(&ram[phys_addr], &buf[buf_pos], copy_len);
 		num_remaining_bytes -= copy_len;
 		buf_pos += copy_len;
@@ -97,7 +146,7 @@ u8 mmu_fetch(u8 *buf, u32 addr, usize size)
 			? PAGE_LEN - va.offset
 			: num_remaining_bytes;
 
-		usize phys_addr = get_phys_addr(va);
+		usize phys_addr = get_phys_addr(va.rpn, va.upn, va.offset);
 		memcpy(&buf[buf_pos], &ram[phys_addr], copy_len);
 		num_remaining_bytes -= copy_len;
 		buf_pos += copy_len;
