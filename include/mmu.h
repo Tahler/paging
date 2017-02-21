@@ -8,11 +8,12 @@
 // Offset length in bits
 #define OFFSET_LEN 12
 // 1st virtual page frame number bit position in virtual address
-#define VPFN_0_OFFSET 0
+#define RPT_OFFSET 0
 // 2nd virtual page frame number bit position in virtual address (10)
-#define VPFN_1_OFFSET (VPFN_0_OFFSET + PFN_LEN)
+#define UPT_OFFSET (RPT_OFFSET + PFN_LEN)
 // Offset bit position in virtual address (20)
-#define OFFSET_OFFSET (VPFN_1_OFFSET + PFN_LEN)
+#define OFFSET_OFFSET (UPT_OFFSET + PFN_LEN)
+
 // Length of the virtual address in bits (32)
 #define VIRT_ADDR_LEN (2 * PFN_LEN + OFFSET_LEN)
 // Address space in bytes = 2^VIRT_ADDR_LEN (4 GB)
@@ -23,10 +24,16 @@
 #define TBL_ENTRY_LEN 2
 // Number of entries in a page table (1024)
 #define PFN_RANGE (1 << PFN_LEN)
-#define RPT_SIZE PFN_RANGE
-#define UPT_SIZE (RPT_SIZE * PAGE_LEN)
-// Length of a page table in bytes (2048)
-#define RPT_LEN (RPT_SIZE * TBL_ENTRY_LEN)
+
+#define NUM_RPT_ENTRIES PFN_RANGE
+// Length of the root page table in bytes (2048)
+#define RPT_LEN (NUM_RPT_ENTRIES * TBL_ENTRY_LEN)
+
+#define NUM_ENTRIES_PER_PAGE (PAGE_LEN / 2)
+#define NUM_UPT_ENTRIES (NUM_RPT_ENTRIES * NUM_ENTRIES_PER_PAGE)
+// Length of the user page table in bytes ()
+#define UPT_LEN (NUM_UPT_ENTRIES * TBL_ENTRY_LEN)
+
 #define NUM_PHYS_PAGES 4
 // Length of physical memory in bytes (18432)
 #define PHYS_RAM_LEN ((NUM_PHYS_PAGES * PAGE_LEN) + RPT_LEN)

@@ -4,6 +4,7 @@
 #include <tberry/types.h>
 
 #include "mmu.h"
+
 /*
  * Returns true if the bits across both arrays are equal.
  */
@@ -12,7 +13,18 @@ bool arrays_are_equal(const void *a1, const void *a2, usize len)
 	return memcmp(a1, a2, len) == 0;
 }
 
-void test_can_store_and_fetch()
+void test_store_fetch_basic()
+{
+	u8 store[1] = { 42 };
+	u32 rp0_up0 = 0x00000000;
+	mmu_store(store, rp0_up0, 1);
+
+	u8 load[1];
+	mmu_fetch(load, rp0_up0, 1);
+	assert(arrays_are_equal(store, load, 1));
+}
+
+void test_store_fetch_swap()
 {
 	u8 store[6] = { 1, 2, 3, 4, 5, 6 };
 	u32 rp0_up0 = 0x00000000;
@@ -29,7 +41,7 @@ void test_can_store_and_fetch()
 	assert(arrays_are_equal(store, load, 6));
 }
 
-void test_can_store_and_fetch_overflow()
+void test_store_fetch_overflow()
 {
 	u8 store[4097];
 	store[0] = 24;
@@ -51,6 +63,7 @@ void test_can_store_and_fetch_overflow()
 
 int main()
 {
-	test_can_store_and_fetch();
-	// test_can_store_and_fetch_overflow();
+	test_store_fetch_basic();
+	// test_store_fetch_swap();
+	// test_store_fetch_overflow();
 }

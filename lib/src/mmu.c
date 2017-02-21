@@ -15,12 +15,22 @@
 #define UPT_PAGE_OFFSET (PHYS_PAGES_OFFSET + (UPT_PAGE * PAGE_LEN))
 #define PHYS_PAGE 1
 #define PHYS_PAGE_OFFSET (PHYS_PAGES_OFFSET + (PHYS_PAGE * PAGE_LEN))
+#define VAR_PAGE 2
+#define VAR_PAGE_OFFSET (PHYS_PAGES_OFFSET + (VAR_PAGE * PAGE_LEN))
+#define LOADED_RPN_OFFSET (VAR_PAGE_OFFSET + 0)
+#define LOADED_UPN_OFFSET (VAR_PAGE_OFFSET + 2)
+
+static char *swapfile = "swapfile";
 
 static u8 ram[PHYS_RAM_LEN];
 static u16 *rpt = (u16*) &ram[RPT_OFFSET];
 // These are swapped into page 0 and page 1 respectively
 static u16 *upt_page = (u16*) &ram[UPT_PAGE_OFFSET];
 static u16 *phys_page = (u16*) &ram[PHYS_PAGE_OFFSET];
+// Intended to be used for one element: the current loaded virtual address
+static u16 *loaded_rpn = (u16*) &ram[LOADED_RPN_OFFSET];
+static u16 *loaded_upn = (u16*) &ram[LOADED_UPN_OFFSET];
+// TODO: throw illegal address if requesting past address space
 
 void mmu_init()
 {
@@ -36,11 +46,50 @@ bool next_is_in_memory(u16 entry)
 	return (entry >> 15) & 0b1;
 }
 
-usize get_swap_addr(u16 rpn, u16 upn, u16 offset)
+/*
+ * Returns the absolute address of the page of the user page table in the
+ * swapfile
+ */
+usize get_upt_swap_addr(u16 rpn)
 {
-	return rpn * PAGE_LEN * PAGE_LEN
-		+ upn * PAGE_LEN
-		+ offset;
+	return rpn * PAGE_LEN;
+}
+
+/*
+ * Returns the absolute address of the physical page in the swapfile
+ */
+usize get_phys_swap_addr(u16 rpn, u16 upn)
+{
+	// Physical pages in the swap file start immediately after the UPT
+	usize phys_pages_offset = UPT_LEN;
+
+	usize upt_base_addr = rpn * PFN_RANGE * PAGE_LEN;
+	usize phys_base_addr = upt_base_addr + (upn * PAGE_LEN);
+	return phys_pages_offset + phys_base_addr;
+}
+
+u8 load_upt_page(u16 rpn)
+{
+	usize swap_addr = get_upt_swap_addr(rpn);
+	return fs_load_buf(swapfile, swap_addr, upt_page, PAGE_LEN);
+}
+
+u8 save_upt_page()
+{
+	usize swap_addr = get_upt_swap_addr(*loaded_rpn);
+	return fs_save_buf(swapfile, swap_addr, upt_page, PAGE_LEN);
+}
+
+u8 load_phys_page(u16 rpn, u16 upn)
+{
+	usize swap_addr = get_phys_swap_addr(rpn, upn);
+	return fs_load_buf(swapfile, swap_addr, phys_page, PAGE_LEN);
+}
+
+u8 save_phys_page()
+{
+	usize swap_addr = get_phys_swap_addr(*loaded_rpn, *loaded_upn);
+	return fs_save_buf(swapfile, swap_addr, phys_page, PAGE_LEN);
 }
 
 /*
@@ -52,9 +101,9 @@ usize get_swap_addr(u16 rpn, u16 upn, u16 offset)
 usize get_upt_base_addr(u16 rpn)
 {
 	if (!next_is_in_memory(rpt[rpn])) {
-		// TODO: save the old page
-		usize swap_addr = get_swap_addr(rpn, 0, 0);
-		fs_load_buf("swapfile", swap_addr, upt_page, PAGE_LEN);
+		save_upt_page();
+		load_upt_page(rpn);
+
 		u16 loaded_addr = UPT_PAGE;
 		// Set in mem bit
 		u16 new_entry = loaded_addr | 0x8000;
@@ -74,8 +123,8 @@ usize get_upt_base_addr(u16 rpn)
 usize get_phys_base_addr(u16 rpn, u16 upn)
 {
 	if (!next_is_in_memory(upt_page[upn])) {
-		usize swap_addr = get_swap_addr(rpn, upn, 0);
-		fs_load_buf("swapfile", swap_addr, phys_page, PAGE_LEN);
+		save_phys_page();
+		load_phys_page(rpn, upn);
 
 		u16 loaded_addr = PHYS_PAGE;
 		u16 new_entry = loaded_addr | 0x8000;
@@ -93,6 +142,12 @@ usize get_phys_addr(u16 rpn, u16 upn, u16 offset)
 {
 	/*usize upt_base_addr =*/ get_upt_base_addr(rpn);
 	usize phys_base_addr = get_phys_base_addr(rpn, upn);
+	printf("rpn %d\n", *loaded_rpn);
+	printf("upn %d\n", *loaded_upn);
+	*loaded_rpn = rpn;
+	*loaded_upn = upn;
+	printf("rpn %d\n", *loaded_rpn);
+	printf("upn %d\n\n", *loaded_upn);
 	usize phys_addr = phys_base_addr + offset;
 	return phys_addr;
 }
@@ -114,9 +169,10 @@ u8 mmu_store(u8 *buf, u32 addr, usize size)
 		buf_pos += copy_len;
 
 		if (overflow) {
-			bool up_overflow = (va.upn + 1) >= RPT_SIZE;
+			bool up_overflow = (va.upn + 1) >= NUM_RPT_ENTRIES;
 			if (up_overflow) {
-				bool rp_overflow = (va.rpn + 1) >= RPT_SIZE;
+				bool rp_overflow =
+					(va.rpn + 1) >= NUM_RPT_ENTRIES;
 				if (rp_overflow) {
 					// TODO: resolve
 					// Error
@@ -152,9 +208,10 @@ u8 mmu_fetch(u8 *buf, u32 addr, usize size)
 		buf_pos += copy_len;
 
 		if (overflow) {
-			bool up_overflow = (va.upn + 1) >= RPT_SIZE;
+			bool up_overflow = (va.upn + 1) >= NUM_RPT_ENTRIES;
 			if (up_overflow) {
-				bool rp_overflow = (va.rpn + 1) >= RPT_SIZE;
+				bool rp_overflow =
+					(va.rpn + 1) >= NUM_RPT_ENTRIES;
 				if (rp_overflow) {
 					// TODO: resolve
 					// Error
