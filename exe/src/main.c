@@ -37,8 +37,6 @@ void test_store_fetch_swap()
 	assert(arrays_are_equal(store, load, 6));
 	mmu_fetch(load, rp1_up1, 6);
 	assert(arrays_are_equal(store, load, 6));
-	mmu_fetch(load, rp1_up1, 6);
-	assert(arrays_are_equal(store, load, 6));
 }
 
 void test_store_fetch_overflow()
@@ -64,6 +62,6 @@ int main()
 {
 	mmu_init();
 	test_store_fetch_basic();
-	// test_store_fetch_swap();
+	test_store_fetch_swap();
 	// test_store_fetch_overflow();
 }

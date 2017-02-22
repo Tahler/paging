@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <tberry/types.h>
+#include <array_utils.h>
 
 #include "mmu.h"
 #include "fs.h"
@@ -43,6 +44,7 @@ void print_rpt()
 
 void mmu_init()
 {
+	fs_delete_file(swapfile);
 }
 
 /*
@@ -103,6 +105,7 @@ u8 load_upt_page(u16 rpn)
 {
 	// UPT is not in memory anymore
 	clear_flags(&rpt[*loaded_rpn], 1);
+	clear_flags(&upt_page[*loaded_upn], 1);
 	usize swap_addr = get_upt_swap_addr(rpn);
 	u8 return_code =
 	    fs_load_buf(swapfile, swap_addr, (u8 *) upt_page, PAGE_LEN);
@@ -132,6 +135,7 @@ u8 load_phys_page(u16 rpn, u16 upn)
 	usize swap_addr = get_phys_swap_addr(rpn, upn);
 	u8 return_code = fs_load_buf(swapfile, swap_addr, phys_page, PAGE_LEN);
 	upt_page[upn] = PHYS_PAGE;
+	set_flags(&upt_page[upn], 1);
 	*loaded_upn = upn;
 	return return_code;
 }
@@ -150,11 +154,17 @@ u8 save_phys_page()
  */
 u16 get_ppn(u16 rpn, u16 upn, u16 offset)
 {
+	printf("saving upt_page\n");
 	save_upt_page();
+	printf("saving phys_page\n");
 	save_phys_page();
+	printf("\n");
 
+	printf("loading upt_page\n");
 	load_upt_page(rpn);
+	printf("loading phys_page\n");
 	load_phys_page(rpn, upn);
+	printf("\n");
 
 	return PHYS_PAGE + offset;
 }
@@ -260,16 +270,4 @@ u8 mmu_fetch(u8 * buf, u32 addr, usize size)
 
 //      u16 upt_entry = upt[rpt_entry];
 //      u16_to_bytes(upt_entry, upte);
-// }
-
-// TODO: should be a single swap file
-/*
- * Saves the user page to disk, stored at fs/pages/@rpt_idx/@upt_idx
- */
-// u8 save_page(u16 rpt_idx, u16 upt_idx, u8 *page_buf)
-// {
-//      // strlen("fs/65535/65535") == 14
-//      char file_name[14];
-//      sprintf(file_name, "fs/%d/%d", rpt_idx, upt_idx)
-//      return write_buf(file_name, page_buf, PAGE_LEN);
 // }
