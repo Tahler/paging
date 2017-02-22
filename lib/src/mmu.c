@@ -31,16 +31,6 @@ u8 *phys_page = (u8 *) (ram + PHYS_PAGE_OFFSET);
 // Intended to be used for one element: the current loaded virtual address
 u16 *loaded_rpn = (u16 *) (ram + LOADED_RPN_OFFSET);
 u16 *loaded_upn = (u16 *) (ram + LOADED_UPN_OFFSET);
-// TODO: throw illegal address if requesting past address space
-
-void print_rpt()
-{
-	printf("[");
-	for (int i = 0; i < 5; i++) {
-		printf("%d, ", rpt[i]);
-	}
-	printf("%d]\n", rpt[6]);
-}
 
 void mmu_init()
 {
