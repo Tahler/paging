@@ -146,6 +146,15 @@ u8 save_phys_page()
 	return fs_save_buf(swapfile, swap_addr, phys_page, PAGE_LEN);
 }
 
+void swap(u16 rpn, u16 upn)
+{
+	save_upt_page();
+	save_phys_page();
+
+	load_upt_page(rpn);
+	load_phys_page(rpn, upn);
+}
+
 /*
  * Loads the correct pages into memory and returns the physical address into the
  * loaded physical page.
@@ -154,18 +163,7 @@ u8 save_phys_page()
  */
 u16 get_ppn(u16 rpn, u16 upn, u16 offset)
 {
-	printf("saving upt_page\n");
-	save_upt_page();
-	printf("saving phys_page\n");
-	save_phys_page();
-	printf("\n");
-
-	printf("loading upt_page\n");
-	load_upt_page(rpn);
-	printf("loading phys_page\n");
-	load_phys_page(rpn, upn);
-	printf("\n");
-
+	swap(rpn, upn);
 	return PHYS_PAGE + offset;
 }
 
@@ -196,10 +194,9 @@ u8 cpy_loop(u32 addr, u8 *src, u8 *dest, usize size, void cpy_fn(u8 *, u8 *, usi
 				bool rp_overflow =
 				    (va.rpn + 1) >= NUM_RPT_ENTRIES;
 				if (rp_overflow) {
-					// TODO: resolve
+					// TODO: do this ahead of time
 					// Error
-					printf("ERROR - overflowed rpt");
-					exit(1);
+					return ILLEGAL_ADDRESS;
 				} else {
 					va.rpn += 1;
 				}
@@ -233,18 +230,22 @@ u8 mmu_fetch(u8 *buf, u32 addr, usize size)
 	return cpy_loop(addr, buf, ram, size, *fetch_mem_cpy);
 }
 
-// u8 mmu_fetch_rpt(u8 *buf, usize max_size)
-// {
-//      // u16 rpt_entry = rpt[parsed]
-// }
+/*
+ * Stores the entire RPT into @buf
+ *
+ * Note: ignores @max_size
+ */
+u8 mmu_fetch_rpt(u8 *buf, usize max_size)
+{
+	memcpy(buf, (u8 *)rpt, RPT_LEN);
+	return SUCCESS;
+}
 
-// u8 mmu_fetch_page_table_entries(u8 *rpte, u8 *upte, u32 addr, usize max_size)
-// {
-//      struct parsed_addr parsed = parse_addr(addr);
-
-//      u16 rpt_entry = rpt[parsed.rpn];
-//      u16_to_bytes(rpt_entry, rpte);
-
-//      u16 upt_entry = upt[rpt_entry];
-//      u16_to_bytes(upt_entry, upte);
-// }
+u8 mmu_fetch_page_table_entries(u8 *rpte, u8 *upte, u32 addr, usize max_size)
+{
+	struct parsed_addr pa = parse_addr(addr);
+	swap(pa.rpn, pa.upn);
+	memcpy(rpte, (u8 *)(&rpt[pa.rpn]), 2);
+	memcpy(upte, (u8 *)(&upt_page[pa.upn]), 2);
+	return SUCCESS;
+}
