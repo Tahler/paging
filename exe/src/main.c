@@ -63,5 +63,5 @@ int main()
 	mmu_init();
 	test_store_fetch_basic();
 	test_store_fetch_swap();
-	// test_store_fetch_overflow();
+	test_store_fetch_overflow();
 }

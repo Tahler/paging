@@ -50,7 +50,7 @@ void mmu_init()
 /*
  * Sets the first bit on each entry in @buf for @len entries
  */
-void set_flags(u16 * buf, usize len)
+void set_flags(u16 *buf, usize len)
 {
 	for (int i = 0; i < len; i++) {
 		buf[i] |= 0x8000;
@@ -60,7 +60,7 @@ void set_flags(u16 * buf, usize len)
 /*
  * Clears the first bit on each entry in @buf for @len entries
  */
-void clear_flags(u16 * buf, usize len)
+void clear_flags(u16 *buf, usize len)
 {
 	for (int i = 0; i < len; i++) {
 		buf[i] &= ~0x8000;
@@ -174,22 +174,19 @@ usize get_phys_addr(u16 ppn)
 	return PHYS_PAGES_OFFSET + (ppn * PAGE_LEN);
 }
 
-u8 mmu_store(u8 * buf, u32 addr, usize size)
+u8 cpy_loop(u32 addr, u8 *src, u8 *dest, usize size, void cpy_fn(u8 *, u8 *, usize, usize, usize))
 {
-	printf("store, buf[0] = %d\n", buf[0]);
 	struct parsed_addr va = parse_addr(addr);
 	usize num_remaining_bytes = size;
 	usize buf_pos = 0;
 	do {
-		printf("store loop:\n");
 		bool overflow = (va.offset + num_remaining_bytes) > PAGE_LEN;
 		usize copy_len = overflow
 		    ? PAGE_LEN - va.offset : num_remaining_bytes;
 
 		u16 ppn = get_ppn(va.rpn, va.upn, va.offset);
 		usize phys_addr = get_phys_addr(ppn);
-		// TODO: this is the only line that differs
-		memcpy(&ram[phys_addr], &buf[buf_pos], copy_len);
+		cpy_fn(dest, src, buf_pos, phys_addr, copy_len);
 		num_remaining_bytes -= copy_len;
 		buf_pos += copy_len;
 
@@ -216,44 +213,24 @@ u8 mmu_store(u8 * buf, u32 addr, usize size)
 	return SUCCESS;
 }
 
-u8 mmu_fetch(u8 * buf, u32 addr, usize size)
+void store_mem_cpy(u8 *buf, u8 *ram, usize buf_offset, usize ram_offset, usize size)
 {
-	printf("fetch\n");
-	struct parsed_addr va = parse_addr(addr);
-	usize num_remaining_bytes = size;
-	usize buf_pos = 0;
-	do {
-		bool overflow = (va.offset + num_remaining_bytes) > PAGE_LEN;
-		usize copy_len = overflow
-		    ? PAGE_LEN - va.offset : num_remaining_bytes;
+	memcpy(&ram[ram_offset], &buf[buf_offset], size);
+}
 
-		usize ppn = get_ppn(va.rpn, va.upn, va.offset);
-		usize phys_addr = get_phys_addr(ppn);
-		memcpy(&buf[buf_pos], &ram[phys_addr], copy_len);
-		num_remaining_bytes -= copy_len;
-		buf_pos += copy_len;
+void fetch_mem_cpy(u8 *ram, u8 *buf, usize buf_offset, usize ram_offset, usize size)
+{
+	memcpy(&buf[buf_offset], &ram[ram_offset], size);
+}
 
-		if (overflow) {
-			bool up_overflow = (va.upn + 1) >= NUM_RPT_ENTRIES;
-			if (up_overflow) {
-				bool rp_overflow =
-				    (va.rpn + 1) >= NUM_RPT_ENTRIES;
-				if (rp_overflow) {
-					// TODO: resolve
-					// Error
-					printf("ERROR - overflowed rpt");
-					exit(1);
-				} else {
-					va.rpn += 1;
-				}
-				va.upn = 0;
-			} else {
-				va.upn += 1;
-			}
-			va.offset = 0;
-		}
-	} while (num_remaining_bytes > 0);
-	return SUCCESS;
+u8 mmu_store(u8 *buf, u32 addr, usize size)
+{
+	return cpy_loop(addr, ram, buf, size, *store_mem_cpy);
+}
+
+u8 mmu_fetch(u8 *buf, u32 addr, usize size)
+{
+	return cpy_loop(addr, buf, ram, size, *fetch_mem_cpy);
 }
 
 // u8 mmu_fetch_rpt(u8 *buf, usize max_size)
