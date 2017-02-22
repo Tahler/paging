@@ -58,11 +58,11 @@ void test_store_fetch_overflow()
 	u8 load_end[1];
 	mmu_fetch(load_end, rp0_up1, 1);
 	assert(load_end[0] == 42);
-	assert(arrays_are_equal(&store[4096], load_end, 1));
 }
 
 int main()
 {
+	mmu_init();
 	test_store_fetch_basic();
 	// test_store_fetch_swap();
 	// test_store_fetch_overflow();
